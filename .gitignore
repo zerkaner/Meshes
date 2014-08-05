@@ -8,7 +8,11 @@
 
 # Build results
 
-[Dd]ebug/
+3DEngine/[Dd]ebug/
+Converter/[Dd]ebug/
+Core/[Dd]ebug/
+Data/[Dd]ebug/
+UserInterface/[Dd]ebug/
 [Rr]elease/
 x64/
 build/
