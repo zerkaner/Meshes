@@ -27,6 +27,9 @@
     <ClInclude Include="Material.h">
       <Filter>Headerdateien</Filter>
     </ClInclude>
+    <ClInclude Include="MDX.h">
+      <Filter>Headerdateien</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Model3D.cpp">

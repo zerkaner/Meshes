@@ -12,7 +12,7 @@
 #include <vector>
 #include "stb_image.h"
 
-#include <MDX.h>
+//#include <MDX.h>
 
 
 /* Utility for geometry and texture loading. */

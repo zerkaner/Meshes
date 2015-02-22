@@ -126,6 +126,7 @@ refl
 
 
 void Loader::loadMDX (const char* filename) {
+/*
   FILE* fp = fopen (filename, "rb");
   if (fp != NULL) {
     
@@ -404,4 +405,5 @@ void Loader::loadMDX (const char* filename) {
     fclose (fp);
   }
   else printf ("File not found or access denied!\n");
+  */
 }

@@ -28,6 +28,7 @@ class Converter {
     void readOBJ  ();  //TODO
     void readMDL  ();  //TODO
     void readMDX  ();  //TODO
+    void readMTL  (const char* filename, std::vector<Material*>* materials);
     void readMS3D ();  //TODO
     void readRAW  ();  // Texture format (heightmap).
 

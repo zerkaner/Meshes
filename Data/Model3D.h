@@ -13,10 +13,10 @@
 class Model3D {
 
   protected:
-    int   _id;               // Model ID, maybe useful later.
-    int   _nrGeosets = 0;    // Number of geosets. 
-    Geoset* _geosets = NULL; // Pointer to the geosets.
-
+    int   _id;                    // Model ID, maybe useful later.
+    int   _nrGeosets = 0;         // Number of geosets. 
+    Geoset* _geosets = NULL;      // Pointer to the geosets.
+    Material* _materials = NULL;  // Material pointer.
 
   public:
 
@@ -25,13 +25,19 @@ class Model3D {
 
     /* Destructor, frees all allocated memory. */
     ~Model3D () {
-      for (int i = 0; i < _nrGeosets; i ++) free (_geosets[i].geometries);
+      for (int i = 0; i < _nrGeosets; i ++) {
+        free (_geosets[i].vertices);
+        free (_geosets[i].normals);
+        free (_geosets[i].textures);
+        free (_geosets[i].geometries);
+      }
       free (_geosets);
     }
 
     /* Create a new geoset with the given content and add it to the model. */
-    void CreateGeoset (int id, bool enabled, long nrGeometries, Geometry* geom);
-    
+    void CreateGeoset (int id, bool enabled, long nrV, long nrN, long nrT, long nrG, 
+                       Vertex* vert,  Vertex* norm, TexCoord* text, Geometry* geom);
+
     /* Remove a geoset from the model. */
     void RemoveGeoset (int id);
 

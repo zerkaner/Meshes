@@ -96,9 +96,9 @@ void dev0 () {
   //Loader loader = Loader();
   //loader.loadMDX ("..\\Debug\\in\\Cat.mdx");  
   ModelGL* m2 = new ModelGL (85, NULL);
-  m2->LoadFile ("..\\Debug\\out\\draken.mod");
+  m2->LoadFile ("..\\Debug\\out\\Bear.mod");
   m2->Echo (false);
-  //m2->Echo (true);
+  m2->Echo (true);
   getchar ();
 }
 
@@ -107,7 +107,7 @@ void dev1 () {
   Loader loader = Loader ();
   //Texture* texture = loader.LoadTexture ("..\\Debug\\in\\bsb2.tga");
   m2 = new ModelGL (85, NULL);
-  m2->LoadFile ("..\\Debug\\out\\cow.mod");
+  m2->LoadFile ("..\\Debug\\out\\Bear.mod");
   m2->Echo (false);
   m2->Echo (true);
   engine->AddModel (m2);
@@ -129,17 +129,17 @@ void dev1 () {
 void dev2 () {
   engine->camera->SetPosition (100, 65, 120, 38, -8);
   Loader loader = Loader ();
-  Texture* texture = loader.LoadTexture ("..\\Debug\\in\\bsb2.tga");
-  m2 = new ModelGL (85, texture);
-  m2->LoadFile ("..\\Debug\\out\\Bear.mod");
+  //Texture* texture = loader.LoadTexture ("..\\Debug\\in\\bsb2.tga");
+  //m2 = new ModelGL (85, texture);
+  //m2->LoadFile ("..\\Debug\\out\\Bear.mod");
 
   ModelGL* m3 = new ModelGL (84, NULL);
   m3->LoadFile ("..\\Debug\\out\\draken.mod");
   
-  m2->Echo (false);
+  //m2->Echo (false);
   m3->Echo (false);
 
-  engine->AddModel (m2);
+  //engine->AddModel (m2);
   engine->AddModel (m3);
 
   glEnable (GL_LIGHTING);   // Enable lighting.

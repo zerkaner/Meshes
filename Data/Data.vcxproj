@@ -73,6 +73,7 @@
   <ItemGroup>
     <ClInclude Include="Datatypes.h" />
     <ClInclude Include="Material.h" />
+    <ClInclude Include="MDX.h" />
     <ClInclude Include="Model3D.h" />
     <ClInclude Include="Texture.h" />
   </ItemGroup>

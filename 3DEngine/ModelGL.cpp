@@ -43,20 +43,21 @@ void ModelGL::ChangeMode (int mode) {
 /* Direct model rendering an the CPU. */
 void ModelGL::renderDirect (Geoset geoset) {
   glEnable (GL_TEXTURE_2D);
-  if (_texture != NULL) glBindTexture (GL_TEXTURE_2D, _texture->id());      
+  if (_texture != NULL) glBindTexture (GL_TEXTURE_2D, _texture->id());        
   glBegin (GL_TRIANGLES);
-  for (int i = 0, c; i < geoset.nrGeometries; i ++) {
+
+  for (int i = 0, c, vIdx, nIdx, tIdx; i < geoset.nrG; i ++) {
     for (c = 0; c < 3; c ++) {
-      glTexCoord2f(geoset.geometries[i].texcoords[c].u, 
-                   geoset.geometries[i].texcoords[c].v);
-      glNormal3f  (geoset.geometries[i].normals[c].x, 
-                   geoset.geometries[i].normals[c].y, 
-                   geoset.geometries[i].normals[c].z);
-      glVertex3f  (geoset.geometries[i].vertices[c].x, 
-                   geoset.geometries[i].vertices[c].y, 
-                   geoset.geometries[i].vertices[c].z);
+      vIdx = geoset.geometries[i].vIdx[c];
+      nIdx = geoset.geometries[i].nIdx[c];
+      tIdx = geoset.geometries[i].tIdx[c];
+
+      glTexCoord2f(geoset.textures[tIdx].u, geoset.textures[tIdx].v);
+      glNormal3f  (geoset.normals [nIdx].x, geoset.normals [nIdx].y, geoset.normals [nIdx].z);
+      glVertex3f  (geoset.vertices[vIdx].x, geoset.vertices[vIdx].y, geoset.vertices[vIdx].z);
     }   
   }  
+
   glEnd();
   glDisable (GL_TEXTURE_2D);
 }
@@ -66,13 +67,8 @@ void ModelGL::renderDirect (Geoset geoset) {
 /* Just vertex point output. */
 void ModelGL::renderPoints (Geoset geoset) {
   glBegin (GL_POINTS);      
-  for (int i = 0, c; i < geoset.nrGeometries; i ++) {
-    for (c = 0; c < 3; c ++) {
-      glVertex3f  (geoset.geometries[i].vertices[c].x, 
-                   geoset.geometries[i].vertices[c].y, 
-                   geoset.geometries[i].vertices[c].z);    
-    }   
-  }
+  for (int i = 0; i < geoset.nrV; i ++) 
+    glVertex3f (geoset.vertices[i].x, geoset.vertices[i].y, geoset.vertices[i].z);
   glEnd ();
 }
 
@@ -80,12 +76,11 @@ void ModelGL::renderPoints (Geoset geoset) {
 
 /* Render a non-textured mesh of the model. */
 void ModelGL::renderMesh (Geoset geoset) {  
-  for (int i = 0, c; i < geoset.nrGeometries; i ++) {
-    glBegin (GL_LINE_LOOP);
+  for (int i = 0, c, vIdx; i < geoset.nrG; i ++) {
+    glBegin (GL_LINE_LOOP); 
     for (c = 0; c < 3; c ++) {
-      glVertex3f  (geoset.geometries[i].vertices[c].x, 
-                   geoset.geometries[i].vertices[c].y, 
-                   geoset.geometries[i].vertices[c].z);  
+      vIdx = geoset.geometries[i].vIdx[c];
+      glVertex3f  (geoset.vertices[vIdx].x, geoset.vertices[vIdx].y, geoset.vertices[vIdx].z);
     } 
     glEnd();
   }    
@@ -99,31 +94,35 @@ void ModelGL::buildVBOs () {
   // Reserve memory and loop over all geosets.
   _VBOs = (GeosetVBO*) calloc (_nrGeosets, sizeof (GeosetVBO));
   for (int g = 0; g < _nrGeosets; g ++) {
-    _VBOs[g].length = _geosets[g].nrGeometries * 3;            // Set vertex count.
+    _VBOs[g].length = _geosets[g].nrG * 3;                     // Set vertex count.
     if (_texture != NULL) _VBOs[g].textureID = _texture->id(); // Set texture ID.
 
     // Build temporary arrays based on geometry definitions.
-    int vsize = _geosets[g].nrGeometries * 3 * 3; //| 3 vertices per geometry
-    int nsize = _geosets[g].nrGeometries * 3 * 3; //| with 3 points, 3 nv-points 
-    int tsize = _geosets[g].nrGeometries * 3 * 2; //| and 2 texture coords each.
+    int vsize = _geosets[g].nrG * 3 * 3; //| 3 vertices per geometry
+    int nsize = _geosets[g].nrG * 3 * 3; //| with 3 points, 3 nv-points 
+    int tsize = _geosets[g].nrG * 3 * 2; //| and 2 texture coords each.
     float* vdata = new float [vsize];
     float* ndata = new float [nsize];
     float* tdata = new float [tsize];
 
     // Extract data for each geoset.
-    for (int i = 0; i < _geosets[g].nrGeometries; i ++) { // i: Loop over geometries.
-      for (int c = 0; c < 3; c ++) {                      // c: Loop over geom indices.
+    int vIdx, nIdx, tIdx;                        // Storage for index shortening.
+    for (int i = 0; i < _geosets[g].nrG; i ++) { // i: Loop over geometries.
+      for (int c = 0; c < 3; c ++) {             // c: Loop over geom indices.
+        vIdx = _geosets[g].geometries[i].vIdx[c];
+        nIdx = _geosets[g].geometries[i].nIdx[c];
+        tIdx = _geosets[g].geometries[i].tIdx[c];
 
-        vdata [i*9 + c*3 + 0] = _geosets[g].geometries[i].vertices[c].x;  // Outer offset: 9 (3*inner).
-        vdata [i*9 + c*3 + 1] = _geosets[g].geometries[i].vertices[c].y;  // Inner offset: 3 (3 runs each).
-        vdata [i*9 + c*3 + 2] = _geosets[g].geometries[i].vertices[c].z;
+        vdata [i*9 + c*3 + 0] = _geosets[g].vertices[vIdx].x;  // Outer offset: 9 (3*inner).
+        vdata [i*9 + c*3 + 1] = _geosets[g].vertices[vIdx].y;  // Inner offset: 3 (3 runs each).
+        vdata [i*9 + c*3 + 2] = _geosets[g].vertices[vIdx].z;
         
-        ndata [i*9 + c*3 + 0] = _geosets[g].geometries[i].normals[c].x;
-        ndata [i*9 + c*3 + 1] = _geosets[g].geometries[i].normals[c].y;
-        ndata [i*9 + c*3 + 2] = _geosets[g].geometries[i].normals[c].z;
+        ndata [i*9 + c*3 + 0] = _geosets[g].normals[nIdx].x;
+        ndata [i*9 + c*3 + 1] = _geosets[g].normals[nIdx].y;
+        ndata [i*9 + c*3 + 2] = _geosets[g].normals[nIdx].z;
         
-        tdata [i*6 + c*2 + 0] = _geosets[g].geometries[i].texcoords[c].u;  // OO: 6 (2*3)
-        tdata [i*6 + c*2 + 1] = _geosets[g].geometries[i].texcoords[c].v;  
+        tdata [i*6 + c*2 + 0] = _geosets[g].textures[tIdx].u;  // OO: 6 (2*3)
+        tdata [i*6 + c*2 + 1] = _geosets[g].textures[tIdx].v;   
       }
     }
 

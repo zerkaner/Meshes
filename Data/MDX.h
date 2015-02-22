@@ -113,13 +113,13 @@ typedef struct {
   DWORD PriorityPlane;
   DWORD Flags;  // Flags: 1 - ConstantColor, 8 - SortPrimNearZ, 16 - SortPrimFarZ, 32 - FullResolution
   LayerChunk* LayerChunk;
-} Material;
+} Material2;
 
 
 // Material chunk.
 typedef struct {
   DWORD ChunkSize;
-  Material* Materials;
+  Material2* Materials;
 } MaterialChunk;
 
 

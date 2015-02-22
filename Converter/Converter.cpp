@@ -80,25 +80,33 @@ void Converter::readRAW () {
   fread (heights, sizeof (BYTE), width*height, _fp);
 
   // Create counter and structures for storage.
-  int nrGeos = (int) (width*height*2) / (LOD*LOD);  // *2: two triangles based on these points.
-  Geometry* geometries = (Geometry*) calloc (nrGeos, sizeof (Geometry));
+  int nrVNT = (int) (width*height*6) / (LOD*LOD);  // *6: two triangles based on these points.
+  int nrG   = nrVNT / 3;
+  Vertex*   vertices   = (Vertex*)   calloc (nrVNT, sizeof (Vertex));
+  Vertex*   normals    = (Vertex*)   calloc (nrVNT, sizeof (Vertex));
+  TexCoord* textures   = (TexCoord*) calloc (nrVNT, sizeof (TexCoord));
+  Geometry* geometries = (Geometry*) calloc (nrG,   sizeof (Geometry));
 
 
   // Iterate over all vertices and set up the values.
-  for (int x = 0, gI=0, tmpX, tmpZ; x < width; x += LOD) {  // X values.
-    for (int z = 0; z < height; z += LOD) {                 // Z-values.
-      for (int nTri = 0; nTri < 6; nTri ++) {               // Triangle comp.
+  for (int x = 0, vI=0, gI=0, tmpX, tmpZ; x < width; x += LOD) {  // X values.
+    for (int z = 0; z < height; z += LOD) {                       // Z-values.
+      for (int nTri = 0; nTri < 6; nTri ++, vI ++) {              // Triangle comp.
         tmpX = x + ((nTri == 1 || nTri == 2 || nTri == 5) ? LOD : 0);
-        tmpZ = z + ((nTri == 1 || nTri == 4 || nTri == 5) ? LOD : 0);          
-
-        geometries[gI].vertices[nTri%3].x = (float) tmpX;
-        geometries[gI].vertices[nTri%3].y = heights[tmpX*width + tmpZ];
-        geometries[gI].vertices[nTri%3].z = (float) tmpZ;          
-        
-        geometries[gI].texcoords[nTri%3].u = (float) tmpX / width;
-        geometries[gI].texcoords[nTri%3].v = (float) tmpZ / height;
-
-        if (nTri == 2 || nTri == 5) gI ++;  // Increase geometry offset.
+        tmpZ = z + ((nTri == 1 || nTri == 4 || nTri == 5) ? LOD : 0);   
+        vertices[vI].x = (float) tmpX;
+        vertices[vI].y = heights[tmpX*width + tmpZ];
+        vertices[vI].z = (float) tmpZ;          
+        textures[vI].u = (float) tmpX / width;
+        textures[vI].v = (float) tmpZ / height;
+      }
+      
+      // Set up geometries.
+      for (int geom = 2; geom > 0; geom --, gI ++) {
+        geometries[gI].symIndices = true;
+        geometries[gI].vIdx[0] = vI - (geom*3);      // No need to copy to n and t. The
+        geometries[gI].vIdx[1] = vI - (geom*3 - 1);  // next Load() will do it for us!
+        geometries[gI].vIdx[2] = vI - (geom*3 - 2);
       }
     }
   }
@@ -106,7 +114,8 @@ void Converter::readRAW () {
   // Remove temporary data and create new model with terrain geoset.
   free (heights);
   _model = new Model3D (00);
-  _model->CreateGeoset (0, true, nrGeos, geometries); 
+  _model->CreateGeoset (0, true, nrVNT, nrVNT, nrVNT, nrG, vertices, normals, textures, geometries); 
+
 
   // Print results and return.
   printf ("Terrain interpreter results:\n"
@@ -115,7 +124,7 @@ void Converter::readRAW () {
           " - Details   : %d\n"
           " - Vtx/Nm/Tex: %d\n"
           " - Geometries: %d\n", 
-          width, height, LOD, nrGeos*3, nrGeos);
+          width, height, LOD, nrVNT, nrG);
 }
 
 
@@ -125,7 +134,7 @@ void Converter::readMDX  () {
   printf ("MDX converter loaded.\n");
  
   // Iteration variables.
-  int g, i, j, ref;
+  int g, i;
   DWORD dbuf = 0x00;
 
   // 3D model, counters and memory pointers.
@@ -176,9 +185,13 @@ void Converter::readMDX  () {
     fread (&nrG, sizeof (DWORD), 1, _fp);
     nrG /= 3;  // Only triangles used! 
     totalG += nrG;
-    WORD3* vRef = new WORD3 [nrG];
-    for (i = 0; i < nrG; i ++) fread (&vRef[i].indices, sizeof (WORD), 3, _fp);
-
+    geometries = (Geometry*) calloc (nrG, sizeof (Geometry));
+    for (i = 0; i < nrG; i ++) {
+      geometries[i].symIndices = true;
+      fread (&geometries[i].vIdx[0], sizeof (WORD), 1, _fp);
+      fread (&geometries[i].vIdx[1], sizeof (WORD), 1, _fp);
+      fread (&geometries[i].vIdx[2], sizeof (WORD), 1, _fp);
+    }
     fread (&dbuf, sizeof (DWORD), 1, _fp);  // Skip 'GNDX'.
     fread (&dbuf, sizeof (DWORD), 1, _fp);  // Read vertex group numbers.
     for (i = dbuf; i > 0; i --) fread (&dbuf, sizeof (BYTE), 1, _fp);
@@ -193,28 +206,9 @@ void Converter::readMDX  () {
       fread (&textures[i].v, sizeof (float), 1, _fp);
     }
 
-    // Build geometries
-    geometries = (Geometry*) calloc (nrG, sizeof (Geometry));
-    for (i = 0; i < nrG; i ++) {
-      for (j = 0; j < 3; j ++) {
-        ref = vRef[i].indices[j];
-        geometries[i].vertices[j].x  = vertices[ref].x;
-        geometries[i].vertices[j].y  = vertices[ref].y;
-        geometries[i].vertices[j].z  = vertices[ref].z;
-        geometries[i].normals[j].x   =  normals[ref].x;
-        geometries[i].normals[j].y   =  normals[ref].y;
-        geometries[i].normals[j].z   =  normals[ref].z;
-        geometries[i].texcoords[j].u = textures[ref].u;
-        geometries[i].texcoords[j].v = textures[ref].v;
-      }    
-    }
+    // Add new geoset.
+    _model->CreateGeoset (g, true, nrV, nrN, nrT, nrG, vertices, normals, textures, geometries);
 
-    // Add new geoset and free the temporary arrays.
-    _model->CreateGeoset (g, true, nrG, geometries);
-    free (vertices);
-    free (normals);
-    free (textures);
-    delete [] vRef;
 
     // Scan to 'VRTX' (to skip the rubbish afterwards), then reset to proper start.
     if (remaining > 0) {
@@ -241,6 +235,7 @@ void Converter::readOBJ  () {
 
   int v, vn, vt;       // Index variables for faces match.
   char buffer [256];   // Input buffer for file read-in.
+  char mtlfile [80];   // Material library file name.
 
 
   // First run: Determine geosets and array sizes.
@@ -282,7 +277,7 @@ void Converter::readOBJ  () {
   Vertex*   normals    = (Vertex*)   calloc (counters[curGeo].n, sizeof (Vertex));
   TexCoord* textures   = (TexCoord*) calloc (counters[curGeo].t, sizeof (TexCoord));
   Geometry* geometries = (Geometry*) calloc (counters[curGeo].g, sizeof (Geometry));
-
+  std::vector<Material*> materials = std::vector<Material*>();
 
 
   // Second run: Gather data and load them into structures.
@@ -314,20 +309,21 @@ void Converter::readOBJ  () {
       char* splitPtr = strtok (buffer, " ");  // Split of first segment.      
       while (splitPtr != NULL) {  
         count ++;
+        //if (count == 4) break;  // Break on invalid mesh.
         indices = (long*) realloc (indices, count * sizeof (long));
 
         // Dereference the vertices, normals and texture crap.
         if (sscanf (splitPtr, "%d/%d/%d", &v, &vt, &vn) == 3) {
-          geometries[curG].vertices[count-1]  = vertices[ v - foV];
-          geometries[curG].normals[count-1]   =  normals[vn - foN];
-          geometries[curG].texcoords[count-1] = textures[vt - foT];     
+          geometries[curG].vIdx [count-1] = v  - foV;
+          geometries[curG].nIdx [count-1] = vn - foN;
+          geometries[curG].tIdx [count-1] = vt - foT;      //TODO What if there are no n or t vrtx?
         }
         else if (sscanf (splitPtr, "%d//%d", &v, &vn) == 2) {
-          geometries[curG].vertices[count-1] = vertices[ v - foV];
-          geometries[curG].normals[count-1]  =  normals[vn - foN];
+          geometries[curG].vIdx[count-1] = v  - foV;
+          geometries[curG].nIdx[count-1] = vn - foN;
         }
         else if (sscanf (splitPtr, "%d", &v) == 1) {
-          geometries[curG].vertices[count-1] = vertices[ v - foV];
+          geometries[curG].vIdx[count-1] =  v - foV;
         }
         else count --;
 
@@ -336,19 +332,23 @@ void Converter::readOBJ  () {
       curG ++;
     }
 
+    // Load material (mtllib).
+    else if (startsWith (buffer, "mtllib ")) {
+      sscanf (buffer, "mtllib %s", &mtlfile);
+      readMTL (mtlfile, &materials);
+    }
+
 
     // If geoset group is finished, write it to model!
     if (curV == counters[curGeo].v && curN == counters[curGeo].n && 
         curT == counters[curGeo].t && curG == counters[curGeo].g) {
 
-      _model->CreateGeoset (curGeo, true, counters[curGeo].g, geometries);
-      
+      _model->CreateGeoset (curGeo, true, counters[curGeo].v, counters[curGeo].n, 
+                            counters[curGeo].t, counters[curGeo].g, 
+                            vertices, normals, textures, geometries);
       curGeo ++;
       foV += curV; foN += curN; foT += curT;  // Increase faces offset
       curV = 0; curN = 0; curT = 0; curG = 0; // Reset counters.
-      //free (vertices);
-      //free (normals);
-      //free (textures);
 
       // Still geosets left? Re-allocate memory then!
       if (curGeo < geos) {
@@ -360,20 +360,75 @@ void Converter::readOBJ  () {
     }
   }
 
-  //TODO Load material (mtllib).
-
-
-
-
   // Print parser results.
   printf ("Parser results:  \n"
           " - Geosets   : %d\n"
           " - Vertexes  : %d\n"
           " - Normals   : %d\n"
-          " - Textures  : %d\n"
+          " - Materials : %d\n"
+          " - Tex Coords: %d\n"
           " - Geometries: %d\n", 
-            geos, tV, tN, tT, tG);
+            geos, tV, tN, materials.size(), tT, tG);
 }
+
+
+
+void Converter::readMTL (const char* filename, std::vector<Material*>* materials) {
+  FILE* fp = fopen (filename, "r");
+  
+  // Print error, if file is not existent.
+  if (fp == NULL) { 
+    printf ("Error: Material library \"%s\" could not be opened!\n", filename);
+    return;
+  }
+
+  // File successfully opened. Start parsing.
+  Material* mtl = NULL; // Current material to set. 
+  char buffer [256];    // Buffer for reader. 
+  
+  printf ("Loading material library \"%s\".\n", filename); 
+  while (fgets (buffer, 256, fp) != NULL) {
+  
+    // A new material. Save last one to vector.
+    if (startsWith (buffer, "newmtl ")) {
+      if (mtl != NULL) materials->push_back (mtl);
+      mtl = new Material ();
+      sscanf(buffer, "newmtl %s", &(mtl->identifier));
+    }
+
+    // Read lighting/reflection values and texture file name.
+    else if (startsWith (buffer, "Ka ")) sscanf(buffer, "Ka %f %f %f", 
+      &mtl->ambientLight[0], &mtl->ambientLight[1], &mtl->ambientLight[2]);
+    else if (startsWith (buffer, "Kd ")) sscanf(buffer, "Kd %f %f %f", 
+      &mtl->diffuseLight[0], &mtl->diffuseLight[1], &mtl->diffuseLight[2]);
+    else if (startsWith (buffer, "Ks ")) sscanf(buffer, "Ks %f %f %f", 
+      &mtl->specularLight[0], &mtl->specularLight[1], &mtl->specularLight[2]);
+    else if (startsWith (buffer, "map_Kd ")) sscanf(buffer, "map_Kd %s", 
+      &mtl->textureName);
+  }
+
+  // Write last entry and close file stream.
+  if (mtl != NULL) materials->push_back (mtl);
+  fclose (fp);
+
+  /*
+  printf ("Materials read: %d\n", materials->size());
+  for (int i = 0; i < materials->size(); i ++) {
+    printf ("(%d)  Name: %s    \n"
+            "     Text: %s     \n"
+            "     Ka: %f %f %f \n"
+            "     Kd: %f %f %f \n"
+            "     Ks: %f %f %f \n", i,
+            materials->at(i)->identifier,
+            materials->at(i)->textureName,
+            materials->at(i)->ambientLight[0], materials->at(i)->ambientLight[1], materials->at(i)->ambientLight[2], 
+            materials->at(i)->diffuseLight[0], materials->at(i)->diffuseLight[1], materials->at(i)->diffuseLight[2],
+            materials->at(i)->specularLight[0],materials->at(i)->specularLight[1],materials->at(i)->specularLight[2] 
+    );   
+  } */
+}
+
+
 
 
 
